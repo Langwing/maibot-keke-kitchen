@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>可可喵的厨房</title>
+<style>
+  /* 深色自包含配色：所有元素自带背景和文字色，在浅色/深色宿主里都清晰 */
+  :root {
+    color-scheme: dark;
+    --bg-card: #232833;
+    --bg-input: #191d24;
+    --line: #3a4150;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --accent: #f59e0b;
+    --accent-soft: #fbbf24;
+    --danger: #f87171;
+  }
+  body.maibot-page {
+    font-family: system-ui, "Microsoft YaHei", sans-serif;
+    margin: 0; padding: 14px 16px 40px; color: var(--text); background: transparent;
+  }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 13px; margin: 18px 0 8px; color: var(--accent-soft); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  button { border: 1px solid var(--line); background: #333a47; color: #d1d5db;
+           border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent-soft); }
+  button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #111827; font-weight: 600; }
+  button.primary:hover { background: var(--accent-soft); color: #111827; }
+  input, select { background: var(--bg-input); border: 1px solid var(--line); color: var(--text);
+                  border-radius: 6px; padding: 3px 7px; font-size: 13px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .num { width: 64px; text-align: right; }
+  .unit { width: 52px; }
+  .name { width: 96px; }
+  select.cat { max-width: 110px; }
+
+  /* 钱包条 */
+  .wallet { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: #2a2313; border: 1px solid #665018; border-radius: 8px;
+            padding: 8px 12px; font-size: 13px; margin-top: 10px; }
+  .wallet .money { font-size: 18px; font-weight: 700; color: var(--accent-soft); }
+
+  /* 分类筛选 */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--bg-card); color: var(--muted);
+          border-radius: 14px; padding: 3px 12px; font-size: 12px; cursor: pointer; user-select: none; }
+  .chip b { color: var(--text); font-weight: 600; margin-left: 2px; }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #111827; }
+  .chip.active b { color: #111827; }
+
+  /* 紧凑卡片网格 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 8px; }
+  .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 8px;
+          padding: 7px 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .card .nm { font-weight: 600; font-size: 14px; min-width: 58px; }
+  .card .tag { font-size: 11px; color: var(--accent-soft); border: 1px solid #665018;
+               border-radius: 10px; padding: 0 8px; }
+  .card.zero { border-color: #7f1d1d; }
+  .card.zero .nm::after { content: "（已用完）"; font-size: 11px; color: var(--danger); font-weight: 400; }
+  .card .spacer { flex: 1; }
+  .card button { padding: 2px 8px; }
+
+  .addbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            background: var(--bg-card); border: 1px dashed var(--line); border-radius: 8px; padding: 10px; }
+  .addbar label { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .meal { color: var(--muted); font-size: 12px; padding: 2px 0; }
+  .empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+  #msg { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px;
+         background: #111827; color: #fff; border: 1px solid var(--line); border-radius: 8px;
+         padding: 7px 16px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9; }
+  #msg.show { opacity: .95; }
+  #msg.err { background: #7f1d1d; }
+</style>
+</head>
+<body class="maibot-page">
+  <div class="toolbar">
+    <div>
+      <h1>🍳 可可喵的厨房 <span class="sub">手动维护库存，保存后立即生效</span></h1>
+    </div>
+    <button id="refresh">刷新</button>
+  </div>
+
+  <div class="wallet" id="wallet">
+    <span>买菜钱：</span><span class="money" id="wallet-balance">--</span><span>元</span>
+    <span style="flex:1"></span>
+    <input class="num" id="wallet-input" type="number" step="any" min="0" placeholder="新余额">
+    <button id="wallet-save">修改余额</button>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div id="sections"></div>
+
+  <h2>＋ 新增食材</h2>
+  <div class="addbar">
+    <input class="name" id="add-name" placeholder="名称，如 牛肉" maxlength="30">
+    <input class="num" id="add-amount" type="number" step="any" placeholder="数量">
+    <input class="unit" id="add-unit" placeholder="单位，如 斤" maxlength="10">
+    <select class="cat" id="add-cat"></select>
+    <label><input type="checkbox" id="add-unlimited">无限常备</label>
+    <button class="primary" id="add-save">添加</button>
+  </div>
+
+  <h2>最近做的饭</h2>
+  <div id="meals"><div class="empty">加载中…</div></div>
+
+  <div id="msg"></div>
+
+<script type="module">
+  // 启动诊断：任何脚本错误直接显示在页面上，方便远程排查
+  const showFatal = (label, detail) => {
+    const el = document.querySelector("#meals");
+    if (el) el.innerHTML = `<div class="empty" style="color:#f87171">${label}: ${String(detail).replace(/[<>&]/g, "")}</div>`;
+  };
+  window.addEventListener("error", (ev) => showFatal("脚本错误", ev.message));
+  window.addEventListener("unhandledrejection", (ev) => showFatal("启动失败", ev.reason && (ev.reason.message || ev.reason)));
+
+  await maibot.ready;
+
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+    (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmtNum = (n) => (+n === Math.floor(+n) ? String(+n) : String(+n));
+
+  let STATE = null;      // 最近一次 state 查询结果
+  let FILTER = "全部";   // 当前分类筛选
+
+  function toast(text, ok = true) {
+    const el = $("#msg");
+    el.textContent = text;
+    el.classList.toggle("err", !ok);
+    el.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+  const fail = (e) => { toast((e && (e.message || e.error || String(e))) || "操作失败", false); console.error(e); };
+
+  function relTime(ts) {
+    const d = Math.max(0, Math.floor(Date.now() / 1000 - Number(ts || 0)));
+    if (d < 60) return "刚刚";
+    if (d < 3600) return Math.floor(d / 60) + " 分钟前";
+    if (d < 86400) return Math.floor(d / 3600) + " 小时前";
+    return Math.floor(d / 86400) + " 天前";
+  }
+
+  function cardHTML(item) {
+    const unlimited = item.amount < 0;
+    const mid = unlimited
+      ? `<span class="tag">无限常备</span><input type="hidden" class="row-amount" value="-1">`
+      : `<input class="num row-amount" type="number" step="any" min="0" value="${item.amount}"
+             ${item.amount <= 0 ? 'style="border-color:#7f1d1d"' : ""}>
+         <input class="unit row-unit" value="${esc(item.unit || "")}" maxlength="10" placeholder="单位">`;
+    return `<div class="card${!unlimited && item.amount <= 0 ? " zero" : ""}" data-name="${esc(item.name)}">
+      <span class="nm">${esc(item.name)}</span>${mid}
+      <select class="cat row-cat">${STATE.categories.map((c) =>
+        `<option value="${esc(c)}"${c === item.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}
+      </select>
+      <span class="spacer"></span>
+      <button class="row-save primary">存</button>
+      <button class="danger row-del">删</button>
+    </div>`;
+  }
+
+  function bindCard(card) {
+    const name = card.dataset.name;
+    card.querySelector(".row-save").onclick = async () => {
+      const amount = card.querySelector(".row-amount").value;
+      const unit = card.querySelector(".row-unit") ? card.querySelector(".row-unit").value.trim() : "";
+      const cat = card.querySelector(".row-cat").value;
+      if (amount === "") { toast("数量不能为空", false); return; }
+      try {
+        await maibot.action("set_item", { name, amount: Number(amount), unit, cat });
+        toast(`已保存：${name}`);
+        await refresh();
+      } catch (e) { fail(e); }
+    };
+    card.querySelector(".row-del").onclick = async () => {
+      try { await maibot.action("remove_item", { name }); toast(`已删除：${name}`); await refresh(); }
+      catch (e) { fail(e); }
+    };
+  }
+
+  function renderChips(items) {
+    const cats = ["全部", ...STATE.categories];
+    const counts = Object.fromEntries(STATE.categories.map((c) => [c, 0]));
+    for (const it of items) counts[it.cat] = (counts[it.cat] || 0) + 1;
+    $("#chips").innerHTML = cats.map((c) => {
+      const n = c === "全部" ? items.length : (counts[c] || 0);
+      if (c !== "全部" && n === 0) return "";
+      return `<span class="chip${FILTER === c ? " active" : ""}" data-cat="${esc(c)}">${esc(c)}<b>${n}</b></span>`;
+    }).join("");
+    $("#chips").querySelectorAll(".chip").forEach((el) => {
+      el.onclick = () => { FILTER = el.dataset.cat; renderItems(); };
+    });
+  }
+
+  function renderItems() {
+    const items = STATE.items || [];
+    renderChips(items);
+    const box = $("#sections");
+    if (!items.length) { box.innerHTML = '<div class="empty">厨房空空如也，在下面添加食材吧</div>'; return; }
+    const byCat = Object.fromEntries(STATE.categories.map((c) => [c, []]));
+    for (const it of items) (byCat[it.cat] || (byCat[it.cat] = [])).push(it);
+    const cats = FILTER === "全部"
+      ? STATE.categories.filter((c) => (byCat[c] || []).length)
+      : [FILTER];
+    box.innerHTML = cats.map((c) =>
+      `<h2>${esc(c)} <span class="sub">${byCat[c].length} 种</span></h2>
+       <div class="grid">${byCat[c].map(cardHTML).join("")}</div>`
+    ).join("");
+    box.querySelectorAll(".card").forEach(bindCard);
+  }
+
+  function renderWallet(wallet) {
+    $("#wallet-balance").textContent = fmtNum(wallet.balance);
+    $("#wallet-input").value = "";
+    if (!wallet.enabled) {
+      $("#wallet").querySelectorAll("input,button").forEach((el) => (el.style.display = "none"));
+      $("#wallet").insertAdjacentHTML("beforeend",
+        '<span class="sub">钱包已关闭（记账功能未启用，可在插件设置里打开）</span>');
+    }
+  }
+
+  function renderMeals(meals) {
+    const box = $("#meals");
+    if (!meals.length) { box.innerHTML = '<div class="empty">还没做过饭</div>'; return; }
+    box.innerHTML = meals.map((m) =>
+      `<div class="meal">· ${esc(m.dish)}（${relTime(m.ts)}）</div>`).join("");
+  }
+
+  function renderCatSelect() {
+    $("#add-cat").innerHTML = STATE.categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  }
+
+  async function refresh() {
+    try {
+      STATE = await maibot.query("state");
+      if (FILTER !== "全部" && !STATE.categories.includes(FILTER)) FILTER = "全部";
+      renderCatSelect();
+      renderItems();
+      renderWallet(STATE.wallet || { enabled: false, balance: 0 });
+      renderMeals(STATE.meals || []);
+    } catch (e) { fail(e); }
+  }
+
+  $("#refresh").onclick = refresh;
+
+  $("#wallet-save").onclick = async () => {
+    const v = $("#wallet-input").value;
+    if (v === "") { toast("请填写新余额", false); return; }
+    try { await maibot.action("set_wallet", { balance: Number(v) }); toast("余额已修改"); await refresh(); }
+    catch (e) { fail(e); }
+  };
+
+  $("#add-save").onclick = async () => {
+    const name = $("#add-name").value.trim();
+    const unlimited = $("#add-unlimited").checked;
+    const amountRaw = $("#add-amount").value;
+    const unit = $("#add-unit").value.trim();
+    const cat = $("#add-cat").value;
+    if (!name) { toast("请填写食材名称", false); return; }
+    if (!unlimited && amountRaw === "") { toast("请填写数量，或勾选\"无限常备\"", false); return; }
+    try {
+      await maibot.action("set_item", {
+        name, amount: unlimited ? -1 : Number(amountRaw), unit: unlimited ? "" : unit, cat,
+      });
+      toast(`已添加：${name}`);
+      $("#add-name").value = ""; $("#add-amount").value = ""; $("#add-unit").value = "";
+      $("#add-unlimited").checked = false;
+      FILTER = cat;
+      await refresh();
+    } catch (e) { fail(e); }
+  };
+
+  await refresh();
+</script>
+</body>
+</html>

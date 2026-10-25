@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "id": "local.keke-kitchen",
+  "version": "1.2.0",
+  "name": "可可喵的厨房 | Keke Kitchen",
+  "description": "给可可喵一个真实的厨房：能查看食材、做饭消耗食材、买菜补货，带可开关的虚拟买菜钱包。",
+  "author": {
+    "name": "pankai",
+    "url": "https://github.com/Langwing"
+  },
+  "license": "MIT",
+  "urls": {
+    "repository": "https://github.com/Langwing/maibot-keke-kitchen"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.99.99"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [],
+  "capabilities": [],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": [
+      "zh-CN"
+    ]
+  }
+}

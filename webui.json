@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "required_capabilities": ["custom_pages"],
+  "pages": [
+    {
+      "id": "kitchen",
+      "title": "可可喵的厨房",
+      "mode": "custom",
+      "entry": "webui/index.html",
+      "layout": "document",
+      "placement": "sidebar",
+      "queries": {
+        "state": {"api": "kitchen_state"}
+      },
+      "actions": {
+        "set_item": {
+          "api": "kitchen_set_item",
+          "parameters": {
+            "name": {"type": "string", "required": true, "max_length": 30},
+            "amount": {"type": "number", "required": true},
+            "unit": {"type": "string", "max_length": 10},
+            "cat": {"type": "string", "max_length": 20, "choices": ["蔬菜", "水果", "肉类", "蛋奶豆制品", "水产海鲜", "主食粮油", "调味料", "长期食品", "其他"]}
+          }
+        },
+        "remove_item": {
+          "api": "kitchen_remove_item",
+          "parameters": {
+            "name": {"type": "string", "required": true, "max_length": 30}
+          },
+          "confirmation": "确定从厨房里撤掉这个食材吗？"
+        },
+        "set_wallet": {
+          "api": "kitchen_set_wallet",
+          "parameters": {
+            "balance": {"type": "number", "required": true, "minimum": 0}
+          },
+          "confirmation": "确定直接把买菜钱余额改成这个数吗？"
+        }
+      }
+    }
+  ]
+}
