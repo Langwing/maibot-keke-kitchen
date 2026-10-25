@@ -2,7 +2,7 @@
 
 > 给麦麦一个"真实"的厨房：食材有数量、做饭会消耗、买菜能补货，再配一个可开关的虚拟买菜钱包。
 >
-> MaiBot 插件 · id: `local.keke-kitchen` · 版本 1.2.0 · 作者 pankai · MIT 协议
+> MaiBot 插件 · id: `local.keke-kitchen` · 版本 1.2.0 · 作者 GLM-5.3(flash提供前端) · MIT 协议
 >
 > 本文件分两部分：**上半部分给人看**（这是什么、怎么用），**下半部分给后续维护的 AI 看**（架构、约定）。人类读者读到这里就够了，下面挑感兴趣的看。
 
@@ -72,7 +72,7 @@ MaiBot 管理网页（浏览器打开）→ 侧边栏插件扩展分组 → **�
 
 ### 基本信息
 
-- 插件 ID：`local.keke-kitchen`（v1.2.0，作者 pankai，MIT 协议）
+- 插件 ID：`local.keke-kitchen`（v1.2.0，作者 GLM-5.3(flash提供前端)，MIT 协议）
 - 运行环境：MaiBot 1.x + maibot-plugin-sdk 2.x，Python ≥ 3.10
 - 运行时数据：MaiBot 数据目录下 `data/plugins/local.keke-kitchen/kitchen_state.json`（重启不丢）
 
