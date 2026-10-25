@@ -45,3 +45,16 @@ assert store.find("玉米萝卜肉馅饺子（生）") == "玉米萝卜肉馅饺
 assert store.find("玉米萝卜肉馅饺子") == "玉米萝卜肉馅饺子（生）"  # 差个括号后缀能对上
 assert store.find("韭菜鸡蛋馅饺子（生）") is None  # 新成品名：不该吸并到任何原料
 print("FIND_OK")
+
+# prune() 容量兜底：超上限时只清用完的条目，有效库存不动
+store2 = plugin.KitchenStore(Path("t2"), 0.0)
+for i in range(10):
+    store2.ingredients[f"有效食材{i}"] = {"amount": float(i + 1), "unit": "份", "cat": "其他"}
+for i in range(5):
+    store2.ingredients[f"用完的{i}"] = {"amount": 0.0, "unit": "份", "cat": "其他"}
+removed = store2.prune(12)
+assert len(store2.ingredients) == 12, len(store2.ingredients)
+assert all(r.startswith("用完的") for r in removed) and len(removed) == 3, removed
+removed2 = store2.prune(5)  # 到不了上限：清光用完的即止，有效库存绝不自动删
+assert len(store2.ingredients) == 10 and all(r.startswith("用完的") for r in removed2), removed2
+print("PRUNE_OK removed:", removed, removed2)

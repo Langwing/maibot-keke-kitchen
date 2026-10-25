@@ -1,6 +1,6 @@
 [project]
 name = "maibot-keke-kitchen"
-version = "1.3.0"
+version = "1.4.0"
 description = "麦麦的厨房插件：真实库存的虚拟厨房，做饭扣食材、买菜补货、虚拟买菜钱包，WebUI 可维护库存。"
 readme = "README.md"
 license = { text = "MIT" }

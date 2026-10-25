@@ -189,6 +189,10 @@ class KitchenConfig(PluginConfigBase):
     max_transactions: int = Field(
         default=100, ge=10, le=1000, description="保留最近多少条钱包流水"
     )
+    max_inventory_items: int = Field(
+        default=80, ge=20, le=500,
+        description="厨房条目容量上限；超出时自动清理最早用完（0 量）的条目，有效库存永不自动删除",
+    )
     reset_inventory_on_next_load: bool = Field(
         default=False,
         description="临时开关：设为 true 并重载插件，厨房会恢复成初始清单（钱包和账单保留）",
@@ -315,6 +319,27 @@ class KitchenStore:
         self.meals.append(meal)
         self.meals = self.meals[-max(limit, 5):]
 
+    def prune(self, max_items: int) -> list[str]:
+        """容量兜底：条目超过上限时，从最早录入且已用完（0 量）的清起。
+
+        用完的条目平时保留（让 AI 知道家里常备什么、会主动补货），
+        只有挤占容量时才按录入顺序淘汰。有效库存（数量 > 0 或无限）永不自动删除。
+        """
+        removed: list[str] = []
+        while len(self.ingredients) > max_items:
+            zero = next(
+                (k for k, v in self.ingredients.items() if v.get("amount", 0) == 0), None
+            )
+            if zero is None:
+                logger.warning(
+                    "厨房条目 %d 已超容量上限 %d，但已无用完条目可清（有效库存不自动删除，请手动整理）",
+                    len(self.ingredients), max_items,
+                )
+                break
+            del self.ingredients[zero]
+            removed.append(zero)
+        return removed
+
 
 class MaiKitchenPlugin(MaiBotPlugin):
     """麦麦的厨房插件主类。"""
@@ -339,6 +364,10 @@ class MaiKitchenPlugin(MaiBotPlugin):
             self._store.reset_inventory()
             self._store.save()
             logger.info("厨房已按配置恢复为初始清单（请记得把恢复开关改回 false）")
+        pruned = self._store.prune(int(self.config.max_inventory_items))
+        if pruned:
+            self._store.save()
+            logger.info("厨房清单超出容量，已清理用完条目 %d 项", len(pruned))
         tracked = sum(1 for i in self._store.ingredients.values() if i["amount"] >= 0)
         unlimited = len(self._store.ingredients) - tracked
         logger.info(
@@ -423,7 +452,10 @@ class MaiKitchenPlugin(MaiBotPlugin):
         assert store is not None
 
         tracked = sorted(
-            (name for name, info in store.ingredients.items() if info["amount"] >= 0)
+            (name for name, info in store.ingredients.items() if info["amount"] > 0)
+        )
+        used_up = sorted(
+            (name for name, info in store.ingredients.items() if info["amount"] == 0)
         )
         unlimited = sorted(
             (name for name, info in store.ingredients.items() if info["amount"] < 0)
@@ -433,6 +465,9 @@ class MaiKitchenPlugin(MaiBotPlugin):
             lines.append("【新鲜食材】" + "、".join(store.describe(n) for n in tracked))
         else:
             lines.append("【新鲜食材】空空如也，该去买菜了")
+        if used_up:
+            # 用完的合并成一行紧凑提示：既省上下文，也提醒 AI 可以去补货
+            lines.append("【用完了】" + "、".join(used_up) + "（家里常备但暂时没了，想吃记得买）")
         if unlimited:
             lines.append("【常备无限】" + "、".join(unlimited) + "（米面调料管够）")
         if self.config.wallet_enabled:
@@ -555,12 +590,15 @@ class MaiKitchenPlugin(MaiBotPlugin):
             "by": user_id,
         }
         store.add_meal(meal, int(self.config.max_meals_log))
+        removed = store.prune(int(self.config.max_inventory_items))
         store.save()
 
         parts = [f"做好了\"{dish}\"。用掉：{'、'.join(used_desc) if used_desc else '（没用新鲜食材）'}。"]
         if notes:
             parts.append("注意：" + "；".join(notes) + "。")
             parts.append("缺的食材可以提醒用户补货，或者你自己去菜市场买（用厨房补货工具）。")
+        if removed:
+            parts.append(f"顺手清了清单：{'、'.join(removed)}早就用完了，从厨房记录里移除了。")
         return {
             "success": True,
             "content": "".join(parts),
@@ -700,6 +738,10 @@ class MaiKitchenPlugin(MaiBotPlugin):
             parts.append(f"有几项没看懂已跳过：{'、'.join(bad)}。")
         if note:
             parts.append(f"备注：{note}。")
+        pruned = store.prune(int(self.config.max_inventory_items))
+        if pruned:
+            store.save()
+            parts.append(f"顺手清了清单：{'、'.join(pruned)}早就用完了，从厨房记录里移除了。")
         return {
             "success": True,
             "content": "".join(p for p in parts if p),
