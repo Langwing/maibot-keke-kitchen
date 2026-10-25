@@ -274,11 +274,26 @@ class KitchenStore:
     # ------------------------------------------------------------------
 
     def find(self, name: str) -> str | None:
-        """按名称找食材，支持部分匹配（"肉"能对上"猪肉"）。"""
+        """按名称找食材：先精确，再做受限的部分匹配。
+
+        允许的模糊匹配：简短叫法落在稍长的食材上（"肉"→"猪肉"）、
+        带修饰词的叫法（"新鲜猪肉"→"猪肉"）、成品名只差个括号后缀
+        （"玉米萝卜肉馅饺子"→"玉米萝卜肉馅饺子（生）"）。
+        不允许：把很长的新名字吸并到只包含其中两三个字的原料上，
+        否则登记"玉米萝卜肉馅饺子（生） 60个"会被记到"玉米"头上。
+        """
         if name in self.ingredients:
             return name
-        for key in self.ingredients:
-            if name in key or key in name:
+        if len(name) <= 4:
+            # 短叫法：只落在比它长不多的食材上（肉→猪肉；但"玉米"不会落到"玉米萝卜肉馅饺子（生）"）
+            for key in sorted(self.ingredients, key=len):
+                if name in key and len(key) <= len(name) + 3:
+                    return key
+        # 长叫法：只匹配几乎同名的食材（新鲜猪肉→猪肉 / 去掉括号后缀的成品名）
+        for key in sorted(self.ingredients, key=len):
+            if key in name and len(key) >= len(name) - 2:
+                return key
+            if len(name) >= 5 and name in key and len(key) <= len(name) + 4:
                 return key
         return None
 
@@ -449,16 +464,18 @@ class MaiKitchenPlugin(MaiBotPlugin):
     @Tool(
         "kitchen_cook",
         description=(
-            "你亲自下厨做饭时调用：把用掉的食材从厨房里扣掉。"
+            "你亲自下厨做饭时调用：把用掉的食材从厨房里扣掉。做饭只消耗食材，"
+            "绝不涉及花钱（买菜时已经付过钱），本工具没有金额参数，也不要因为做饭去动钱包。"
             "参数说明：dish（必填）菜名，如\"玉米萝卜猪肉馅饺子\"；"
             "used_ingredients（必填）这次用掉的新鲜食材清单，格式为\"名称 数量单位\"用逗号分隔，"
             "例如\"猪肉 1斤，玉米 2根，白萝卜 1根，饺子皮 30张\"；"
             "用量按做一顿饭的常识估计，别夸张（一顿饺子大约用 1 斤肉、30 张皮），"
-            "米面调料是常备无限的不用列；"
-            "cost_estimate（可选）这顿饭的食材成本估算（元），根据当初买菜花的钱估个大概就行。"
-            "注意：食材在买菜时已经付过钱，做饭本身不会再扣买菜钱，cost_estimate 只是记录。"
-            "如果这顿吃的东西之前已用补货工具作为成品登记过（例如\"玉米萝卜肉馅饺子 40个\"），"
-            "这里直接扣那份成品即可（如\"玉米萝卜肉馅饺子 15个\"），不要再扣一遍原材料。"
+            "米面调料是常备无限的不用列。"
+            "如果这顿吃的东西之前已用补货工具作为成品登记过（例如\"玉米萝卜肉馅饺子（生） 60个\"），"
+            "这里直接按完整名字扣那份成品即可（如\"玉米萝卜肉馅饺子（生） 15个\"），不要再扣一遍原材料。"
+            "做出来的东西如果要存放（生饺子冻冰箱、一锅汤留到晚上），"
+            "做完紧接着调用补货工具把成品按完整名字登记入库（如\"玉米萝卜肉馅饺子（生） 60个\"），"
+            "这样之后吃的时候才有账可扣。"
             "做完后把结果自然地告诉用户，比如做了什么、用了什么、还剩什么。"
         ),
         parameters=[
@@ -482,12 +499,6 @@ class MaiKitchenPlugin(MaiBotPlugin):
                     "例如\"猪肉 1斤，玉米 2根，饺子皮 30张\""
                 ),
                 required=True,
-            ),
-            ToolParameterInfo(
-                name="cost_estimate",
-                param_type=ToolParamType.NUMBER,
-                description="这顿饭的食材成本估算（元），可省略",
-                required=False,
             ),
         ],
         visibility="visible",
@@ -543,12 +554,6 @@ class MaiKitchenPlugin(MaiBotPlugin):
             "used": [f"{n} {fmt_amount(a)}{u}" if a >= 0 else f"{n}（常备）" for n, a, u in items],
             "by": user_id,
         }
-        cost_raw = kwargs.get("cost_estimate")
-        if cost_raw not in (None, ""):
-            try:
-                meal["cost"] = float(cost_raw)
-            except (TypeError, ValueError):
-                pass
         store.add_meal(meal, int(self.config.max_meals_log))
         store.save()
 
@@ -556,8 +561,6 @@ class MaiKitchenPlugin(MaiBotPlugin):
         if notes:
             parts.append("注意：" + "；".join(notes) + "。")
             parts.append("缺的食材可以提醒用户补货，或者你自己去菜市场买（用厨房补货工具）。")
-        if "cost" in meal:
-            parts.append(f"这顿饭食材成本大约 {meal['cost']:g} 元（只是记录，买菜时已经付过钱）。")
         return {
             "success": True,
             "content": "".join(parts),

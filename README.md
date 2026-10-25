@@ -2,7 +2,7 @@
 
 > 给麦麦一个"真实"的厨房：食材有数量、做饭会消耗、买菜能补货，再配一个可开关的虚拟买菜钱包。
 >
-> MaiBot 插件 · id: `local.keke-kitchen` · 版本 1.2.1 · 作者 GLM-5.3(flash提供前端) · MIT 协议
+> MaiBot 插件 · id: `local.keke-kitchen` · 版本 1.3.0 · 作者 GLM-5.3(flash提供前端) · MIT 协议
 >
 > 本文件分两部分：**上半部分给人看**（这是什么、怎么用），**下半部分给后续维护的 AI 看**（架构、约定）。人类读者读到这里就够了，下面挑感兴趣的看。
 
@@ -97,7 +97,7 @@ maibot-keke-kitchen/
 
 1. **常量与工具函数**：`UNLIMITED = -1.0`（amount 为 -1 即"无限常备"）；`DEFAULT_INGREDIENTS`（初始 38 种：21 种无限常备的米面调料 + 17 种计数的新鲜食材）；`parse_items()`（食材清单解析）；`fmt_amount()`、`_relative_time()`。
 2. **`KitchenConfig`**：配置模型（字段见下表）。
-3. **`KitchenStore`**：JSON 持久化。`ingredients: {名称: {amount: float, unit: str}}`；`wallet_balance: float`；`transactions: [{ts, amount, desc}]`（正数充值负数支出）；`meals: [{ts, dish, used: [str], by, cost?}]`。`find()` 支持名称部分匹配（"肉"能对上"猪肉"）。损坏的 state 文件会自动重置为初始清单（钱包保留余额字段）。
+3. **`KitchenStore`**：JSON 持久化。`ingredients: {名称: {amount: float, unit: str}}`；`wallet_balance: float`；`transactions: [{ts, amount, desc}]`（正数充值负数支出）；`meals: [{ts, dish, used: [str], by, cost?}]`。`find()` 支持受限的部分匹配：简短叫法（"肉"→"猪肉"）、带修饰词（"新鲜猪肉"→"猪肉"）、成品名差括号后缀（"玉米萝卜肉馅饺子"→"…（生）"）；**长名字不会吸并到只含其中两三个字的原料**（否则"玉米萝卜肉馅饺子（生） 60个"会被记到"玉米"头上，1.3.0 修复的 bug）。损坏的 state 文件会自动重置为初始清单（钱包保留余额字段）。
 4. **`MaiKitchenPlugin`**：主类 + 4 个 `@Tool`。
 
 ### WebUI 管理 API 契约（v1.1.0 起）
@@ -118,7 +118,7 @@ maibot-keke-kitchen/
 | 工具 | 关键行为 |
 |---|---|
 | `kitchen_query` | 只读。返回全部库存（分"计数/无限"两组）+ 钱包余额（仅开启时）+ 最近 3 顿饭。content 必须可读 |
-| `kitchen_cook` | 扣料。不够的按现有量扣到 0 并写进 notes（不失败）；无限常备不扣；`cost_estimate` 只记入 meals，**不扣钱包**（钱在买菜时已付，避免双重扣款——这是明确设计，别改） |
+| `kitchen_cook` | 扣料。不够的按现有量扣到 0 并写进 notes（不失败）；无限常备不扣；**没有任何金额参数**（1.3.0 移除 cost_estimate：返回文本里出现金额会被笨模型当成支出重复扣钱）；做饭绝不涉及花钱，买菜扣钱只在补货工具；做出来的可存放成品要紧接着用补货工具登记（如"玉米萝卜肉馅饺子（生） 60个"），之后吃的时候按完整名字扣成品 |
 | `kitchen_stock` | 补货/设无限/撤掉食材。`cost` 仅在钱包开启时扣款并记流水。LLM 角色扮演买菜时靠它+cost 完成闭环 |
 | `kitchen_wallet` | 充值/支出/查余额。钱包关闭时返回提示而非报错。注意工具描述里已告知"买菜花费走 kitchen_stock 的 cost，不要在这里重复记" |
 
@@ -157,6 +157,7 @@ python -c "import sys; sys.path.insert(0,'.'); import plugin; print(plugin.parse
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| 1.3.0 | 2026-10-25 | 做饭与钱彻底分离：移除 kitchen_cook 的 cost_estimate 参数与金额文案（防笨模型把成本当支出）；描述补"可存放成品紧接着入库"；修复 find() 模糊匹配吸并 bug（"玉米萝卜肉馅饺子 60个"曾被记到"玉米"头上变成 61 根玉米）|
 | 1.2.1 | 2026-10-25 | 工具描述补充：做好的成品食物（如包好的饺子）必须用 kitchen_stock 登记入库，kitchen_cook 吃成品时不再重复扣原材料（防止口头编造不记账） |
 | 1.2.0 | 2026-10-25 | 管理页改版：食材分类（9 类，存进数据、旧数据自动迁移）、分类筛选条、深色紧凑卡片布局；kitchen_state 返回结构改为 items+categories |
 | 1.1.0 | 2026-10-25 | 新增 WebUI 管理页面（webui.json + webui/index.html + 4 个 @API）：网页上看库存、改数量/单位、增删食材、修正钱包余额 |

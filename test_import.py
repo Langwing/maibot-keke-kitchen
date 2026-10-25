@@ -28,3 +28,20 @@ assert items[0] == ("猪肉", 1.0, "斤"), items[0]
 assert items[1] == ("猪肉", 2.0, "斤"), items[1]  # “数量在前”的写法
 assert items[2] == ("米", plugin.UNLIMITED, "无限"), items[2]
 print("PARSE_OK items:", items)
+
+# find() 模糊匹配回归：长名字成品不能吸并到短原料（玉米饺子→玉米 的 bug）
+store = plugin.KitchenStore(Path("t") , 0.0)
+store.ingredients = {
+    "猪肉": {"amount": 3.0, "unit": "斤", "cat": "肉类"},
+    "玉米": {"amount": 1.0, "unit": "根", "cat": "蔬菜"},
+    "饺子皮": {"amount": 60.0, "unit": "张", "cat": "主食粮油"},
+    "玉米萝卜肉馅饺子（生）": {"amount": 60.0, "unit": "个", "cat": "长期食品"},
+}
+assert store.find("猪肉") == "猪肉"
+assert store.find("肉") == "猪肉"            # 简短叫法
+assert store.find("新鲜猪肉") == "猪肉"       # 带修饰词
+assert store.find("玉米") == "玉米"           # 精确匹配优先，不落到饺子成品上
+assert store.find("玉米萝卜肉馅饺子（生）") == "玉米萝卜肉馅饺子（生）"
+assert store.find("玉米萝卜肉馅饺子") == "玉米萝卜肉馅饺子（生）"  # 差个括号后缀能对上
+assert store.find("韭菜鸡蛋馅饺子（生）") is None  # 新成品名：不该吸并到任何原料
+print("FIND_OK")
