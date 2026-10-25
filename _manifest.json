@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "local.keke-kitchen",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "麦麦的厨房 | Mai Kitchen",
   "description": "给麦麦一个真实的厨房：能查看食材、做饭消耗食材、买菜补货，带可开关的虚拟买菜钱包。",
   "author": {
