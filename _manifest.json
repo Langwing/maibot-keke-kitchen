@@ -2,8 +2,8 @@
   "manifest_version": 2,
   "id": "local.keke-kitchen",
   "version": "1.2.0",
-  "name": "可可喵的厨房 | Keke Kitchen",
-  "description": "给可可喵一个真实的厨房：能查看食材、做饭消耗食材、买菜补货，带可开关的虚拟买菜钱包。",
+  "name": "麦麦的厨房 | Mai Kitchen",
+  "description": "给麦麦一个真实的厨房：能查看食材、做饭消耗食材、买菜补货，带可开关的虚拟买菜钱包。",
   "author": {
     "name": "pankai",
     "url": "https://github.com/Langwing"

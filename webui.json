@@ -4,7 +4,7 @@
   "pages": [
     {
       "id": "kitchen",
-      "title": "可可喵的厨房",
+      "title": "麦麦的厨房",
       "mode": "custom",
       "entry": "webui/index.html",
       "layout": "document",

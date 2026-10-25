@@ -1,6 +1,6 @@
-"""可可喵的厨房插件。
+"""麦麦的厨房插件。
 
-给可可喵一个"真实"的厨房：食材有数量、做饭会消耗、买菜能补货，
+给麦麦一个"真实"的厨房：食材有数量、做饭会消耗、买菜能补货，
 再配一个可开关的虚拟买菜钱包（记账用，不涉及真钱）。
 
 提供给 LLM 的四个工具：
@@ -301,8 +301,8 @@ class KitchenStore:
         self.meals = self.meals[-max(limit, 5):]
 
 
-class KekeKitchenPlugin(MaiBotPlugin):
-    """可可喵的厨房插件主类。"""
+class MaiKitchenPlugin(MaiBotPlugin):
+    """麦麦的厨房插件主类。"""
 
     config_model = KitchenConfig
 
@@ -796,7 +796,7 @@ class KekeKitchenPlugin(MaiBotPlugin):
 
 
     # ------------------------------------------------------------------
-    # WebUI 管理 API（网页后台的"可可喵的厨房"页面用）
+    # WebUI 管理 API（网页后台的"麦麦的厨房"页面用）
     # ------------------------------------------------------------------
 
     def _require_store(self) -> KitchenStore:
@@ -885,5 +885,5 @@ class KekeKitchenPlugin(MaiBotPlugin):
         return {"balance": store.wallet_balance}
 
 
-def create_plugin() -> KekeKitchenPlugin:
-    return KekeKitchenPlugin()
+def create_plugin() -> MaiKitchenPlugin:
+    return MaiKitchenPlugin()
